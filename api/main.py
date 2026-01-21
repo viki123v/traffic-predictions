@@ -125,8 +125,4 @@ def predict_danger(input_data: RoadSegmentInput):
             detail=f"Prediction error: {str(e)}"
         )
 
-# To run this application:
-# 1. Make sure you have templates/index.html
-# 2. Make sure your .joblib files are in the same folder as main.py
-# 3. Run: uvicorn main:app --reload
-# 4. Open browser: http://localhost:8000
+# Run: uvicorn main:app --reload
