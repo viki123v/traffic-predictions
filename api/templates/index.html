@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Road Segment Danger Prediction</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 40px 0;
+        }
+
+        .main-card {
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            border: none;
+            border-radius: 15px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 30px;
+        }
+
+        .format-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .input-field {
+            font-family: monospace;
+            font-size: 0.95rem;
+        }
+
+        .btn-predict {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .btn-predict:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        /* Custom background colors for IRAP classifications */
+        .bg-yellow {
+            background-color: #ffd700 !important;
+        }
+
+        .bg-orange {
+            background-color: #ff8c00 !important;
+        }
+
+        .text-yellow {
+            color: #ffd700 !important;
+        }
+
+        .text-orange {
+            color: #ff8c00 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12">
+                <!-- Main Card -->
+                <div class="card main-card">
+                    <div class="card-header text-center">
+                        <h1 class="mb-0">
+                            <i class="bi bi-sign-turn-right-fill me-2"></i>
+                            Road Segment Danger Prediction
+                        </h1>
+                    </div>
+
+                    <div class="card-body p-4">
+                        <!-- Format Instructions -->
+                        <div class="format-info">
+                            <strong><i class="bi bi-info-circle me-2"></i>Expected Input Format:</strong><br>
+                            LENGTH SECTION; PCI; LIMIT; K.INT P.T; K.Bridges; PGDS; Max_Snow; Ave_Height; Ave_Temp; Max_Temp; Ave_Inc; Ave_Rain
+                            <br><br>
+                            <strong>Example:</strong><br>
+                            1500; 75; 80; 2; 1; 85; 50; 300; 12; 28; 5; 800
+                        </div>
+
+                        <!-- Input Form -->
+                        <form id="predictionForm">
+                            <div class="mb-3">
+                                <label for="inputData" class="form-label fw-bold">
+                                    <i class="bi bi-pencil-square me-1"></i> Enter Road Segment Data:
+                                </label>
+                                <textarea
+                                    class="form-control input-field"
+                                    id="inputData"
+                                    rows="3"
+                                    required
+                                    placeholder="Example: 1500; 75; 80; 2; 1; 85; 50; 300; 12; 28; 5; 800"></textarea>
+                                <small class="form-text text-muted">
+                                    Enter 12 values separated by semicolons (;)
+                                </small>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg btn-predict" id="submitBtn">
+                                    <i class="bi bi-search me-2"></i>Analyze Road Segment
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Loading Indicator -->
+                        <div id="loading" class="text-center mt-4" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Analyzing road segment...</p>
+                        </div>
+
+                        <!-- Error Alert -->
+                        <div id="errorAlert" class="alert alert-danger mt-4" role="alert" style="display: none;">
+                            <i class="bi bi-exclamation-circle-fill me-2"></i>
+                            <span id="errorMessage"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" id="modalContent">
+                <!-- Content will be dynamically inserted -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const errorAlert = document.getElementById('errorAlert');
+            const inputData = document.getElementById('inputData').value;
+
+            errorAlert.style.display = 'none';
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ input_string: inputData })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                const colorStyles = {
+                    'green': {
+                        headerClass: 'bg-success',
+                        textClass: 'text-success',
+                        icon: 'bi-check-circle-fill'
+                    },
+                    'yellow': {
+                        headerClass: 'bg-yellow',
+                        textClass: 'text-yellow',
+                        icon: 'bi-check-circle-fill'
+                    },
+                    'orange': {
+                        headerClass: 'bg-orange',
+                        textClass: 'text-orange',
+                        icon: 'bi-check-circle-fill'
+                    },
+                    'red': {
+                        headerClass: 'bg-danger',
+                        textClass: 'text-danger',
+                        icon: 'bi-exclamation-triangle-fill'
+                    },
+                    'black': {
+                        headerClass: 'bg-dark',
+                        textClass: 'text-dark',
+                        icon: 'bi-x-octagon-fill'
+                    }
+                };
+
+                const style = colorStyles[data.color] || colorStyles['orange'];
+                const headerClass = style.headerClass;
+                const textClass = style.textClass;
+                const icon = style.icon;
+
+                let parsedTable = '<table class="table table-sm mt-2">';
+                for (const [key, value] of Object.entries(data.parsed_values)) {
+                    parsedTable += `<tr><td><strong>${key}:</strong></td><td>${value}</td></tr>`;
+                }
+                parsedTable += '</table>';
+
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="modal-header ${headerClass} text-white">
+                        <h5 class="modal-title">
+                            <i class="${icon} me-2"></i>${data.danger_category}
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-center mb-3">
+                            <i class="${icon} ${textClass}" style="font-size: 4rem;"></i>
+                        </div>
+                        <h4 class="text-center mb-3">
+                            Safety Level: <span class="badge ${headerClass} fs-5">${data.danger_category}</span>
+                        </h4>
+                        <p class="text-center mb-3">
+                            <strong>Weighted Index:</strong>
+                            <span class="fs-4 ${textClass}">${data.danger_index.toFixed(4)}</span>
+                        </p>
+                        <hr>
+                        <h6>Input Values:</h6>
+                        ${parsedTable}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                `;
+
+                resultModal.show();
+
+            } catch (err) {
+                document.getElementById('errorMessage').textContent = err.message;
+                errorAlert.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
